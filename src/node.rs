@@ -79,6 +79,33 @@ impl<T> NodeRef<T> {
         self.children().iter().find(|child| child.key() == key).map(|child| child.rc_clone())
     }
 
+    pub fn edit_value(&mut self, value: T) {
+        let mut node: std::cell::RefMut<'_, Node<T>> = RefCell::borrow_mut(&self.0);
+        node.value = value;
+    }
+
+    pub fn delete_node(&mut self) {
+        // remove the node from the given sets of all its parents and children
+        // perma delete the node after this
+        let mut node: std::cell::RefMut<'_, Node<T>> = RefCell::borrow_mut(&self.0);
+        
+
+        // remove the node from all its parents
+        for parent in node.parents.iter() {
+            let mut parent_node: RefMut<'_, Node<T>> = RefCell::borrow_mut(&parent.0);
+            parent_node.children.remove(&self.rc_clone());
+        }
+
+        // remove the node from all its children
+        for child in node.children.iter() {
+            let mut child_node: RefMut<'_, Node<T>> = RefCell::borrow_mut(&child.0); 
+            child_node.parents.remove(&self.rc_clone());    
+        }
+
+        // delete the node
+        drop(node);
+    }
+
 }
 
 impl<T> Hash for NodeRef<T> {
