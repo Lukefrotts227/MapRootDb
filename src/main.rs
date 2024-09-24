@@ -17,7 +17,6 @@ fn main() {
     // Print information about the structure
     println!("Structure has first node: {}", structure.has_first_node);
     println!("Number of nodes in the structure: {}", structure.nodes.len());
-    println!("Node one has the child node: {}"); 
 
     // Verify that the node was added correctly
     if let Some(added_node) = structure.nodes.get("node1") {

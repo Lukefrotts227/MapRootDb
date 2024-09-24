@@ -27,20 +27,35 @@ impl<T> Structure<T> {
         }
     }
 
-    // for the add node method we will have 3 modes strict, semi-strict , and un-strict, 
-    // strict means that all parents and children must be present in the structure, unless the node is the first node in the structure
+    // for the add node method we will have 2 modes semi-strict and un-strict, 
     // semi strict means at least one parent or child must be present in the structure, unless the node is the first node in the structure
     // un-strict means that the node can be added without any parents or children
+    // more modes will be added but this is good to get it going
 
-    pub fn add_node(&mut self, node: NodeRef<T>) -> Result<NodeRef<T>, bool> {}
+    pub fn add_node(&mut self, node: NodeRef<T>) -> Result<NodeRef<T>, bool> {
+        // depending on the mode use the correct add method
+        match self.mode.as_str() {
+            "semi-strict" => self.semi_strict_add(node),
+            "un-strict" => self.un_strict_add(node),
+            _ => Err(false),
+        }
+    }
 
-    pub fn strict_add(&mut self, node: NodeRef<T>) -> Result<NodeRef<T>, bool> {}
+    fn semi_strict_add(&mut self, node: NodeRef<T>) -> Result<NodeRef<T>, bool> {
+        // perform a semi-strict test on the node to see if it can be added to the structure
+        if self.semi_strict_test(node.rc_clone()) {
+            self.nodes.insert(node.key(), node.rc_clone());
+            return Ok(node)
+        } else {
+            return Err(false)
+        }
+    }
 
-    pub fn semi_strict_add(&mut self, node: NodeRef<T>) -> Result<NodeRef<T>, bool> {}
-
-    pub fn un_strict_add(&mut self, node: NodeRef<T>) -> Result<NodeRef<T>, bool> {}
-
-    pub fn strict_test (&mut self, node: NodeRef<T>) -> bool {}
+    fn un_strict_add(&mut self, node: NodeRef<T>) -> Result<NodeRef<T>, bool> {
+        // simply add the node to the structure
+        self.nodes.insert(node.key(), node.rc_clone());
+        return Ok(node)
+    }
 
     pub fn semi_strict_test (&mut self, node: NodeRef<T>) -> bool  {
         // test if the node has at least one parent or child in the structure
@@ -49,6 +64,8 @@ impl<T> Structure<T> {
 
         if parents.len() == 0 && children.len() == 0 && !self.has_first_node {
             return false
+        } else if parents.len() == 0 && children.len() == 0 && self.has_first_node {
+            return true
         }
 
         // iterate through the parents hashset and if the parent is in the structure return true
@@ -69,9 +86,6 @@ impl<T> Structure<T> {
         // if nothing has been found return false
         return false
     }
-
-
-
 
 }
 
