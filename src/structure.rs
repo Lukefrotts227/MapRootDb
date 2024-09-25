@@ -32,6 +32,37 @@ impl<T> Structure<T> {
     // un-strict means that the node can be added without any parents or children
     // more modes will be added but this is good to get it going
 
+
+    fn semi_strict_check_for_one(&self, node : NodeRef<T>, off_limit_key: &str) -> bool {
+        
+
+        let node_children: std::cell::Ref<'_, std::collections::HashSet<NodeRef<T>>> = node.children();
+        let node_parents: std::cell::Ref<'_, std::collections::HashSet<NodeRef<T>>> = node.parents(); 
+        if node_parents.len() == 1 && node_children.len() == 1 {
+            return false
+        }
+
+        // iterate through node children looking for a valid node exit with true if found 
+        // rembember to exclude the off limit key
+        for child in node_children.iter() {
+            // if the key is part of the structure and is not the off limit key return true
+            if  child.key() != off_limit_key && self.nodes.contains_key(&child.key()) {
+                return true
+            }
+        }
+        // do the same for the parents
+        for parent in node_parents.iter() {
+            // if the key is part of the structure and is not the off limit key return true
+            if  parent.key() != off_limit_key && self.nodes.contains_key(&parent.key()) {
+                return true
+            }
+        }    
+        // if all else fails then return false
+        return false
+        
+
+    }
+
     pub fn delete_node_by_key(&mut self, key: &str) -> bool {
         // remove a node from the structure by key
         // must also delete the node from the parents and children of other nodes
@@ -42,10 +73,67 @@ impl<T> Structure<T> {
         // if the structure is semi-strict and the node being deleted is the last node in the structure then the structure will no longer be semi-strict and the deletion will fail with a return of false
         // return false if the node is not found
 
-        let mut node = self.find_node_by_key(key);
-        if node.is_none() {
+        let prim_node = self.find_node_by_key(key);
+        if prim_node.is_none() {
             return false
         }
+        let mut node: NodeRef<T> = prim_node.unwrap(); 
+        if (self.mode == "un-strict") {
+            self.nodes.remove(key);
+            if self.root.is_some() && self.root.as_ref().unwrap().key() == key {
+                self.root = None;
+            }
+            if self.nodes.len() == 0 {
+                self.has_first_node = false;
+            }
+            node.delete_node();
+            return true
+        }
+
+        // if the we are in a semi-strict db and the node is the last node then the removal is valid 
+        let parents = node.parents(); 
+        let children = node.children();
+        
+        if parents.len() == 0 && children.len() == 0 && !self.has_first_node {
+            return false
+        } else if parents.len() == 0 && children.len() == 0 && self.has_first_node {
+            return true
+        }
+
+
+        // do the semi-strict test on the node being removed
+        // start by iterating throught the parents and children of the node being removed and check for strictness without including the node being removed
+        // if at any point the strictness is broken return false immediately
+
+        // parent check 
+        for parent in parents.iter() {
+            // make sure the parent has at lease one valid child or parent not including the node being removed
+            // use the semi_strict_check_for_one method to check for at least one valid parent or child
+            if !self.semi_strict_check_for_one(parent.rc_clone(), key) {
+                return false
+            }
+        }
+
+        // child check
+        for child in children.iter() {
+            // make sure the child has at lease one valid child or parent not including the node being removed
+            // use the semi_strict_check_for_one method to check for at least one valid parent or child
+            if !self.semi_strict_check_for_one(child.rc_clone(), key) {
+                return false
+            }
+        }
+
+        // if the semi-stric test passes it is safe to remove the node from the structure
+        self.nodes.remove(key);
+        if self.root.is_some() && self.root.as_ref().unwrap().key() == key {
+            self.root = None;
+        }
+        if self.nodes.len() == 0 {
+            self.has_first_node = false;
+        }
+        // use borrow checker shenanigans to delete the node
+        let mut other_same_node = node.rc_clone();
+        other_same_node.delete_node();
         return true
 
 
@@ -86,6 +174,7 @@ impl<T> Structure<T> {
         // perform a semi-strict test on the node to see if it can be added to the structure
         if self.semi_strict_test(node.rc_clone()) {
             self.nodes.insert(node.key(), node.rc_clone());
+            self.has_first_node = true;
             return Ok(node)
         } else {
             return Err(false)
@@ -95,6 +184,7 @@ impl<T> Structure<T> {
     fn un_strict_add(&mut self, node: NodeRef<T>) -> Result<NodeRef<T>, bool> {
         // simply add the node to the structure
         self.nodes.insert(node.key(), node.rc_clone());
+        self.has_first_node = true; 
         return Ok(node)
     }
 
