@@ -1,29 +1,36 @@
 use std::collections::HashMap;
 use crate::node::NodeRef; // Update import to use NodeRef
 
+// add a way to have a hashmap that lets select aspects of the node.value to map to the NodeRef as a whole 
 
-pub struct Structure<T> {
+
+
+pub struct Structure<T: Clone> {
     pub root: Option<NodeRef<T>>,           // Use NodeRef for root
-    pub nodes: HashMap<String, NodeRef<T>>, // Use NodeRef in HashMap
+    pub nodes: HashMap<String, NodeRef<T>>, // main hashmap for the structure that hashes to NodeRefs 
     pub mode: String,
     pub has_first_node: bool,
 }
 
-impl<T> Structure<T> {
+impl<T: Clone + Eq> Structure<T> {
     pub fn new(root: Option<NodeRef<T>>, mode: String) -> Self {
-        let mut nodes = HashMap::new();
-        let mut has_first_node = false;
+        let mut nodes: HashMap<String, NodeRef<T>> = HashMap::new();
+        let mut has_first_node: bool = false;
 
         if let Some(root) = &root {
             nodes.insert(root.key(), root.rc_clone()); // Insert root node
             has_first_node = true;
         }
+     
+        // iterate through the alt_nodes and store all the keys that will be used to hash to the node
+        
 
         Structure {
             root,
             nodes,
             mode,
             has_first_node,
+             
         }
     }
 
@@ -31,6 +38,8 @@ impl<T> Structure<T> {
     // semi strict means at least one parent or child must be present in the structure, unless the node is the first node in the structure
     // un-strict means that the node can be added without any parents or children
     // more modes will be added but this is good to get it going
+    
+   
 
 
     fn semi_strict_check_for_one(&self, node : NodeRef<T>, off_limit_key: &str) -> bool {
@@ -73,6 +82,9 @@ impl<T> Structure<T> {
         // if the structure is semi-strict and the node being deleted is the last node in the structure then the structure will no longer be semi-strict and the deletion will fail with a return of false
         // return false if the node is not found
 
+        // grab all the possible hashmaps from the hashmap of hashmaps 
+
+
         let prim_node = self.find_node_by_key(key);
         if prim_node.is_none() {
             return false
@@ -91,8 +103,8 @@ impl<T> Structure<T> {
         }
 
         // if the we are in a semi-strict db and the node is the last node then the removal is valid 
-        let parents = node.parents(); 
-        let children = node.children();
+        let parents: std::cell::Ref<'_, std::collections::HashSet<NodeRef<T>>> = node.parents(); 
+        let children: std::cell::Ref<'_, std::collections::HashSet<NodeRef<T>>> = node.children();
         
         if parents.len() == 0 && children.len() == 0 && !self.has_first_node {
             return false
@@ -145,12 +157,56 @@ impl<T> Structure<T> {
         // return false if the node is not found
         // return false if this breaks the current strictness of the structure  
 
-        let mut node = self.find_node_by_key(key);
-        if node.is_none() {
+        let prim_node = self.find_node_by_key(key);
+        if prim_node.is_none() {
             return false
         }
 
-        return true 
+        let mut node: NodeRef<T> = prim_node.unwrap(); 
+        if self.mode == "un-strict" {
+            self.nodes.remove(key);
+            if self.root.is_some() && self.root.as_ref().unwrap().key() == key {
+                self.root = None;
+            }
+            if self.nodes.len() == 0 {
+                self.has_first_node = false;
+            }
+            return true
+        }
+
+        let parents: std::cell::Ref<'_, std::collections::HashSet<NodeRef<T>>> = node.parents();
+        let children: std::cell::Ref<'_, std::collections::HashSet<NodeRef<T>>> = node.children(); 
+
+        if parents.len() == 0 && children.len() == 0 && !self.has_first_node {
+            return false
+        } else if parents.len() == 0 && children.len() == 0 && self.has_first_node {
+            return true
+        }
+
+
+        for parent in parents.iter() {
+            if !self.semi_strict_check_for_one(parent.rc_clone(), key) {
+                return false
+            }
+        }
+
+        for child in children.iter() {
+            if !self.semi_strict_check_for_one(child.rc_clone(), key) {
+                return false
+            }
+        }   
+
+        self.nodes.remove(key); 
+        if self.root.is_some() && self.root.as_ref().unwrap().key() == key {
+            self.root = None;
+        }
+        if self.nodes.len() == 0 {
+            self.has_first_node = false;
+        }
+
+        return true
+
+
     }
 
     pub fn find_node_by_key(&self, key: &str) -> Option<NodeRef<T>> {

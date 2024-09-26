@@ -5,9 +5,9 @@ use std::hash::{Hash, Hasher};
 
 
 #[derive(Clone)]
-pub struct NodeRef<T>(Rc<RefCell<Node<T>>>);
+pub struct NodeRef<T: Clone>(Rc<RefCell<Node<T>>>);
 
-impl<T> NodeRef<T> {
+impl<T: Clone> NodeRef<T> {
     pub fn new(key: String, value: T) -> NodeRef<T> {
         NodeRef(Rc::new(RefCell::new(Node {
             key,
@@ -20,7 +20,7 @@ impl<T> NodeRef<T> {
     pub fn key(&self) -> String {
         self.0.borrow().key.clone()
     }
-
+    
     pub fn rc_clone(&self) -> NodeRef<T> {
         let rc: Rc<RefCell<Node<T>>> = Rc::clone(&self.0);
         NodeRef(rc)
@@ -34,7 +34,9 @@ impl<T> NodeRef<T> {
         self.0.borrow_mut()
     }
 
-    
+    pub fn value(&self) -> T {
+        self.0.borrow().value.clone()
+    }    
 
     pub fn add_parent(&mut self, parent: NodeRef<T>) {
         // Add the parent to the current node's parent set
@@ -108,29 +110,30 @@ impl<T> NodeRef<T> {
 
 }
 
-impl<T> Hash for NodeRef<T> {
+impl<T: Clone> Hash for NodeRef<T> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.0.borrow().key.hash(state);
     }
 }
 
-impl<T> PartialEq for NodeRef<T> {
+impl<T: Clone> PartialEq for NodeRef<T> {
     fn eq(&self, other: &Self) -> bool {
         self.0.borrow().key == other.0.borrow().key
     }
 }
 
-impl<T> Eq for NodeRef<T> {}
+impl<T: Clone> Eq for NodeRef<T> {}
 
-pub struct Node<T> {
+pub struct Node<T: Clone> {
     pub key: String,
     pub value: T,
     pub parents: HashSet<NodeRef<T>>,
     pub children: HashSet<NodeRef<T>>,
 }
 
-impl<T> Node<T> {
+impl<T: Clone> Node<T> {
     pub fn new(key: String, value: T) -> NodeRef<T> {
         NodeRef::new(key, value)
     }
 }
+

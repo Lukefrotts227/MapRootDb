@@ -1,5 +1,7 @@
 mod node; 
-mod structure; 
+mod structure;
+mod database; 
+mod puppet; 
 
 
 pub use node::Node;
