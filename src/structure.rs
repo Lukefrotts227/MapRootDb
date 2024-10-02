@@ -1,5 +1,10 @@
 use std::collections::HashMap;
-use crate::node::NodeRef; // Update import to use NodeRef
+use crate::node::{NodeRef}; // Update import to use NodeRef
+use serde::ser::{Serialize, Serializer, SerializeStruct};
+use serde::de::{Deserialize, Deserializer, SeqAccess, Visitor, MapAccess, Error as DeError};
+use std::fmt;
+use bincode::{serialize, deserialize};
+
 
 // add a way to have a hashmap that lets select aspects of the node.value to map to the NodeRef as a whole 
 
@@ -12,7 +17,7 @@ pub struct Structure<T: Clone> {
     pub has_first_node: bool,
 }
 
-impl<T: Clone + Eq> Structure<T> {
+impl<T: Clone + Eq + Serialize> Structure<T> {
     pub fn new(root: Option<NodeRef<T>>, mode: String) -> Self {
         let mut nodes: HashMap<String, NodeRef<T>> = HashMap::new();
         let mut has_first_node: bool = false;
@@ -40,6 +45,20 @@ impl<T: Clone + Eq> Structure<T> {
     // more modes will be added but this is good to get it going
     
    
+    pub fn serialize_related_ids(&self) -> Vec<u8>{
+        // in this function I am seraialing all the keys of the given hashmap so that I can rebuild by grabbing all the nodes by key allowing for rebuild
+        let mut keys: Vec<String> = Vec::new(); 
+        for (key, _) in self.nodes.iter(){
+            keys.push(key.clone()); 
+        }
+
+        // seraialize with bincode
+        let serialized = serialize(&keys).unwrap();
+
+        // now lets retun this vector
+        serialized 
+
+    }
 
 
     fn semi_strict_check_for_one(&self, node : NodeRef<T>, off_limit_key: &str) -> bool {

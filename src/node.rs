@@ -2,12 +2,54 @@ use std::rc::Rc;
 use std::cell::{RefCell, Ref, RefMut};
 use std::collections::HashSet; 
 use std::hash::{Hash, Hasher}; 
+use bincode::{serialize, deserialize};
+use serde::{Serialize, Deserialize};
+use std::io::Write;
+
+
 
 
 #[derive(Clone)]
 pub struct NodeRef<T: Clone>(Rc<RefCell<Node<T>>>);
 
-impl<T: Clone> NodeRef<T> {
+
+
+
+impl<T: Clone + Serialize> NodeRef<T> {
+
+    pub fn serialize_node(&self) -> Vec<u8> {
+        let node: Ref<'_, Node<T>>= self.borrow(); 
+        // split the node into its components to serialize each 
+        let key: String = node.key.clone();
+        let value: T = node.value.clone();
+        let parents: Vec<String> = node.parents.iter().map(|parent| parent.key()).collect::<Vec<String>>();
+        let children: Vec<String> = node.children.iter().map(|child| child.key()).collect::<Vec<String>>();
+
+        // now we serialize each component
+        let key_serialized: Vec<u8> = serialize(&key).unwrap();
+        let value_serialized: Vec<u8> = serialize(&value).unwrap();
+        let parents_serialized: Vec<u8> = serialize(&parents).unwrap();
+        let children_serialized: Vec<u8> = serialize(&children).unwrap();
+
+        fn write_with_length(buffer: &mut Vec<u8>, data: Vec<u8>) {
+            let len = data.len() as u64; 
+            buffer.extend_from_slice(&len.to_le_bytes());
+            buffer.extend_from_slice(&data); 
+
+        }
+
+        let mut s_node = Vec::new();    
+
+        write_with_length(&mut s_node, key_serialized); 
+        write_with_length(&mut s_node, value_serialized);   
+        write_with_length(&mut s_node, parents_serialized);
+        write_with_length(&mut s_node, children_serialized);
+
+        s_node
+
+        
+    } 
+
     pub fn new(key: String, value: T) -> NodeRef<T> {
         NodeRef(Rc::new(RefCell::new(Node {
             key,
@@ -123,7 +165,6 @@ impl<T: Clone> PartialEq for NodeRef<T> {
 }
 
 impl<T: Clone> Eq for NodeRef<T> {}
-
 pub struct Node<T: Clone> {
     pub key: String,
     pub value: T,
@@ -131,7 +172,7 @@ pub struct Node<T: Clone> {
     pub children: HashSet<NodeRef<T>>,
 }
 
-impl<T: Clone> Node<T> {
+impl<T: Clone + Serialize> Node<T> {
     pub fn new(key: String, value: T) -> NodeRef<T> {
         NodeRef::new(key, value)
     }

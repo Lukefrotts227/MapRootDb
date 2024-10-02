@@ -3,14 +3,13 @@
 use crate::structure::{self, Structure}; 
 use crate::node::NodeRef; 
 use std::collections::HashMap;  
-use prost::Message;
- 
+use bincode::{serialize, deserialize}; 
+
 
 pub struct PrimInitDatabase<T: Clone>{
     pub data: Vec<PrimInitStructureWrapper<T>>, 
 
 }
-
 impl<T: Clone> PrimInitDatabase<T>{
     pub fn new() -> Self {
         PrimInitDatabase { data: Vec::new()}
@@ -40,7 +39,14 @@ impl<T: Clone> PrimInitDatabase<T>{
         None
     }
     
+
+    
+
+
+    
+
 }
+
 
 pub struct PrimInitStructureWrapper<T: Clone>{
     pub name: String, // the name of the structure in the db
