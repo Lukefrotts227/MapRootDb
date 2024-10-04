@@ -60,6 +60,21 @@ impl<T: Clone + Eq + Serialize> Structure<T> {
 
     }
 
+    pub fn serialize_related_nodes(&self) -> Vec<Vec<u8>>{
+        // we can use the seralize function that I wrote for indiv nodes
+        let mut over_vector: Vec<Vec<u8>> = Vec::new(); 
+
+        // iterate through the map to get the vectors for each node
+        for (_, node) in self.nodes.iter(){
+            // clone the reference
+            let n: NodeRef<T> = node.rc_clone(); 
+            let serialized: Vec<u8> = n.serialize_node();
+            over_vector.push(serialized);
+        }
+        over_vector
+
+    }
+
 
     fn semi_strict_check_for_one(&self, node : NodeRef<T>, off_limit_key: &str) -> bool {
         

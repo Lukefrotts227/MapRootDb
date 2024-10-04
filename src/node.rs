@@ -82,19 +82,26 @@ impl<T: Clone + Serialize> NodeRef<T> {
 
     pub fn add_parent(&mut self, parent: NodeRef<T>) {
         // Add the parent to the current node's parent set
-        let mut node_self: std::cell::RefMut<'_, Node<T>> = RefCell::borrow_mut(&self.0); 
-        node_self.parents.insert(parent.rc_clone());
-
-        let mut node_parent: std::cell::RefMut<'_, Node<T>> = RefCell::borrow_mut(&parent.0);
-        node_parent.children.insert(self.rc_clone()); 
+        {
+            let mut node_self: std::cell::RefMut<'_, Node<T>> = RefCell::borrow_mut(&self.0); 
+            node_self.parents.insert(parent.rc_clone());
+        }
+        {
+            let mut node_parent: std::cell::RefMut<'_, Node<T>> = RefCell::borrow_mut(&parent.0);
+            node_parent.children.insert(self.rc_clone()); 
+        }
     }
 
     pub fn add_child(&mut self, child: NodeRef<T>) {
-        let mut node_self: std::cell::RefMut<'_, Node<T>> = RefCell::borrow_mut(&self.0);
-        node_self.children.insert(child.rc_clone());
-
-        let mut node_child: std::cell::RefMut<'_, Node<T>> = RefCell::borrow_mut(&child.0); 
-        node_child.parents.insert(self.rc_clone());
+        {
+            let mut node_self: std::cell::RefMut<'_, Node<T>> = RefCell::borrow_mut(&self.0);
+            node_self.children.insert(child.rc_clone());
+        } // `node_self` is dropped here
+    
+        {
+            let mut node_child: std::cell::RefMut<'_, Node<T>> = RefCell::borrow_mut(&child.0); 
+            node_child.parents.insert(self.rc_clone());
+        }
 
     }
 
@@ -154,13 +161,13 @@ impl<T: Clone + Serialize> NodeRef<T> {
 
 impl<T: Clone> Hash for NodeRef<T> {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.0.borrow().key.hash(state);
+        self.0.borrow_mut().key.hash(state);
     }
 }
 
 impl<T: Clone> PartialEq for NodeRef<T> {
     fn eq(&self, other: &Self) -> bool {
-        self.0.borrow().key == other.0.borrow().key
+        self.0.borrow_mut().key == other.0.borrow().key
     }
 }
 
