@@ -1,44 +1,106 @@
 mod node;
 mod structure;
 mod database;
+mod protocol;
+mod server;
 
-use node::NodeRef;
-use structure::Structure;
+use std::net::TcpStream;
+use std::thread;
+use std::time::Duration;
+
+use database::{Database, DatabaseValue};
+use protocol::{Command, Response, write_command, read_response};
+
+fn send(stream: &mut TcpStream, cmd: Command) -> Response {
+    write_command(stream, &cmd).unwrap();
+    read_response(stream).unwrap()
+}
+
+fn run_client_tests() {
+    thread::sleep(Duration::from_millis(100));
+    let mut s = TcpStream::connect("127.0.0.1:7878").unwrap();
+
+    // ping
+    assert!(matches!(send(&mut s, Command::Ping), Response::Pong), "Ping failed");
+    println!("[ok] Ping");
+
+    // add structure
+    assert!(matches!(
+        send(&mut s, Command::AddStructure { name: "people".into(), mode: "un-strict".into() }),
+        Response::Ok
+    ), "AddStructure failed");
+    println!("[ok] AddStructure 'people'");
+
+    // add nodes
+    assert!(matches!(
+        send(&mut s, Command::AddNode {
+            structure: "people".into(), key: "alice".into(),
+            value: DatabaseValue::Text("Alice".into()),
+        }),
+        Response::Ok
+    ), "AddNode alice failed");
+
+    assert!(matches!(
+        send(&mut s, Command::AddNode {
+            structure: "people".into(), key: "bob".into(),
+            value: DatabaseValue::Int(30),
+        }),
+        Response::Ok
+    ), "AddNode bob failed");
+    println!("[ok] AddNode alice, bob");
+
+    // add edge
+    assert!(matches!(
+        send(&mut s, Command::AddEdge {
+            structure: "people".into(),
+            parent_key: "alice".into(),
+            child_key: "bob".into(),
+        }),
+        Response::Ok
+    ), "AddEdge failed");
+    println!("[ok] AddEdge alice -> bob");
+
+    // get node
+    let resp = send(&mut s, Command::GetNode { structure: "people".into(), key: "alice".into() });
+    assert!(matches!(resp, Response::Value(DatabaseValue::Text(_))), "GetNode wrong value");
+    println!("[ok] GetNode alice");
+
+    // get structure
+    let resp = send(&mut s, Command::GetStructure { name: "people".into() });
+    if let Response::NodeList(nodes) = resp {
+        assert_eq!(nodes.len(), 2);
+        let bob_entry = nodes.iter().find(|(k, _, _)| k == "bob").expect("bob missing");
+        // bob has no children
+        assert!(bob_entry.2.is_empty());
+        let alice_entry = nodes.iter().find(|(k, _, _)| k == "alice").expect("alice missing");
+        // alice -> bob
+        assert!(alice_entry.2.contains(&"bob".to_string()));
+        println!("[ok] GetStructure: {} nodes, edges correct", nodes.len());
+    } else {
+        panic!("GetStructure returned unexpected response");
+    }
+
+    // save
+    assert!(matches!(
+        send(&mut s, Command::Save { path: "mydb.bin".into() }),
+        Response::Ok
+    ), "Save failed");
+    println!("[ok] Save mydb.bin");
+
+    // missing structure
+    let resp = send(&mut s, Command::GetNode { structure: "nope".into(), key: "x".into() });
+    assert!(matches!(resp, Response::Error(_)), "Expected error for missing structure");
+    println!("[ok] Error on missing structure");
+
+    println!("\nAll tests passed.");
+    send(&mut s, Command::Shutdown);
+}
 
 fn main() {
-    // create a string structure for testing
-    let mut structure: Structure<String> = Structure::new(None, "un-strict".to_string());
+    let db = Database::new();
 
-    // this structure will not contain a root 
+    thread::spawn(run_client_tests);
 
-    let mut first_node: NodeRef<String> = NodeRef::new("1".to_string(), "Bob".to_string()); 
-    let mut second_node: NodeRef<String> = NodeRef::new("2".to_string(), "Alice".to_string());   
-    let mut third_node: NodeRef<String> = NodeRef::new("3".to_string(), "Charlie".to_string());  
-    let mut fourth_node: NodeRef<String> = NodeRef::new("4".to_string(), "David".to_string());   
-    let mut fifth_node: NodeRef<String> = NodeRef::new("5".to_string(), "Eve".to_string()); 
-
-    // create some relationships now
-    first_node.add_child(third_node.rc_clone());
-
-    second_node.add_parent(fourth_node.rc_clone()); 
-
-    first_node.add_parent(fifth_node.rc_clone()); 
-
-    third_node.add_child(second_node.rc_clone());
-
-    // add it all to the structure now 
-    structure.add_node(first_node.rc_clone());
-    structure.add_node(second_node.rc_clone()); 
-    structure.add_node(third_node.rc_clone()); 
-    structure.add_node(fourth_node.rc_clone()); 
-
-    let s1_vector: Vec<u8> = structure.serialize_related_ids(); 
-    let s2_vector: Vec<Vec<u8>> = structure.serialize_related_nodes(); 
-
-    // print out for testing 
-    println!("Serialized related ids: {:?}", s1_vector);
-    println!("Serialized related nodes: {:?}", s2_vector);
-
-
-
+    server::start(db, "127.0.0.1:7878");
+    println!("Server shut down.");
 }
