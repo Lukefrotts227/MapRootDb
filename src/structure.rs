@@ -386,3 +386,128 @@ impl<T: Clone + Eq + Serialize + DeserializeOwned> Structure<T> {
         Ok(Self::from_bytes(&std::fs::read(path)?))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::database::DatabaseValue;
+    use crate::node::NodeRef;
+
+    fn scratch_path(name: &str) -> std::path::PathBuf {
+        let mut p = std::env::temp_dir();
+        p.push(format!("maprootdb_test_{}_{}.bin", name, std::process::id()));
+        p
+    }
+
+    #[test]
+    fn round_trip_empty_structure() {
+        let structure: Structure<DatabaseValue> = Structure::new(None, "un-strict".to_string());
+
+        let bytes = structure.to_bytes();
+        let restored: Structure<DatabaseValue> = Structure::from_bytes(&bytes);
+
+        assert!(restored.root.is_none());
+        assert_eq!(restored.nodes.len(), 0);
+        assert_eq!(restored.mode, "un-strict");
+        assert_eq!(restored.has_first_node, false);
+    }
+
+    #[test]
+    fn round_trip_single_node() {
+        let root: NodeRef<DatabaseValue> = NodeRef::new("root".to_string(), DatabaseValue::Int(42));
+        let structure: Structure<DatabaseValue> = Structure::new(Some(root), "un-strict".to_string());
+
+        let bytes = structure.to_bytes();
+        let restored: Structure<DatabaseValue> = Structure::from_bytes(&bytes);
+
+        assert_eq!(restored.nodes.len(), 1);
+        assert_eq!(restored.mode, "un-strict");
+        assert!(restored.has_first_node);
+        assert!(restored.root.is_some());
+        assert_eq!(restored.root.as_ref().unwrap().key(), "root");
+        assert_eq!(restored.root.as_ref().unwrap().value(), DatabaseValue::Int(42));
+    }
+
+    #[test]
+    fn round_trip_multi_node_with_edges() {
+        let root: NodeRef<DatabaseValue> = NodeRef::new("root".to_string(), DatabaseValue::Text("root-val".to_string()));
+        let mut structure: Structure<DatabaseValue> = Structure::new(Some(root.rc_clone()), "semi-strict".to_string());
+
+        let mut child_a: NodeRef<DatabaseValue> = NodeRef::new("child_a".to_string(), DatabaseValue::Int(1));
+        let child_b: NodeRef<DatabaseValue> = NodeRef::new("child_b".to_string(), DatabaseValue::Bool(true));
+        let grandchild: NodeRef<DatabaseValue> = NodeRef::new("grandchild".to_string(), DatabaseValue::Float(3.14));
+
+        // root -> child_a, root -> child_b, child_a -> grandchild
+        {
+            let mut root_mut = root.rc_clone();
+            root_mut.add_child(child_a.rc_clone());
+            root_mut.add_child(child_b.rc_clone());
+        }
+        child_a.add_child(grandchild.rc_clone());
+
+        structure.add_node(child_a.rc_clone()).expect("child_a add failed");
+        structure.add_node(child_b.rc_clone()).expect("child_b add failed");
+        structure.add_node(grandchild.rc_clone()).expect("grandchild add failed");
+
+        let bytes = structure.to_bytes();
+        let restored: Structure<DatabaseValue> = Structure::from_bytes(&bytes);
+
+        assert_eq!(restored.mode, "semi-strict");
+        assert!(restored.has_first_node);
+        assert_eq!(restored.nodes.len(), 4);
+        assert_eq!(restored.root.as_ref().unwrap().key(), "root");
+
+        // check values
+        assert_eq!(restored.find_node_by_key("root").unwrap().value(), DatabaseValue::Text("root-val".to_string()));
+        assert_eq!(restored.find_node_by_key("child_a").unwrap().value(), DatabaseValue::Int(1));
+        assert_eq!(restored.find_node_by_key("child_b").unwrap().value(), DatabaseValue::Bool(true));
+        assert_eq!(restored.find_node_by_key("grandchild").unwrap().value(), DatabaseValue::Float(3.14));
+
+        // check edges: root -> child_a, child_b
+        let restored_root = restored.find_node_by_key("root").unwrap();
+        assert!(restored_root.has_child_by_key("child_a"));
+        assert!(restored_root.has_child_by_key("child_b"));
+        assert_eq!(restored_root.children().len(), 2);
+        assert_eq!(restored_root.parents().len(), 0);
+
+        // check reverse edges wired correctly
+        let restored_child_a = restored.find_node_by_key("child_a").unwrap();
+        assert!(restored_child_a.has_parent_by_key("root"));
+        assert!(restored_child_a.has_child_by_key("grandchild"));
+
+        let restored_child_b = restored.find_node_by_key("child_b").unwrap();
+        assert!(restored_child_b.has_parent_by_key("root"));
+        assert_eq!(restored_child_b.children().len(), 0);
+
+        let restored_grandchild = restored.find_node_by_key("grandchild").unwrap();
+        assert!(restored_grandchild.has_parent_by_key("child_a"));
+        assert_eq!(restored_grandchild.children().len(), 0);
+    }
+
+    #[test]
+    fn round_trip_via_file_preserves_mode_and_edges() {
+        let root: NodeRef<DatabaseValue> = NodeRef::new("root".to_string(), DatabaseValue::Null);
+        let mut structure: Structure<DatabaseValue> = Structure::new(Some(root.rc_clone()), "semi-strict".to_string());
+
+        let child: NodeRef<DatabaseValue> = NodeRef::new("child".to_string(), DatabaseValue::Int(7));
+        {
+            let mut root_mut = root.rc_clone();
+            root_mut.add_child(child.rc_clone());
+        }
+        structure.add_node(child.rc_clone()).expect("child add failed");
+
+        let path = scratch_path("structure_file_roundtrip");
+        let path_str = path.to_str().unwrap();
+
+        structure.save_to_file(path_str).expect("save_to_file failed");
+        let restored: Structure<DatabaseValue> = Structure::load_from_file(path_str).expect("load_from_file failed");
+
+        std::fs::remove_file(&path).ok();
+
+        assert_eq!(restored.mode, "semi-strict");
+        assert_eq!(restored.nodes.len(), 2);
+        assert_eq!(restored.root.as_ref().unwrap().key(), "root");
+        assert!(restored.find_node_by_key("root").unwrap().has_child_by_key("child"));
+        assert!(restored.find_node_by_key("child").unwrap().has_parent_by_key("root"));
+    }
+}
