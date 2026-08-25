@@ -1,5 +1,19 @@
 # MapRootDb Revive Plan
 
+**Status: complete (2026-08-25).** All T1-T13 tasks are checked off. `cargo
+build` succeeds with 0 warnings, `cargo test` passes all 21 tests, and
+`docs/index.html` is in place for manual GitHub Pages deployment. Genuinely
+optional future work (not required, not descoped, just not pursued in this
+run): broader multi-parent DAG test coverage beyond what T3/T6 already
+exercise (noted by a reviewer during T3 as a nice-to-have, not a gap in the
+current correctness guarantees), and the user manually pointing GitHub Pages
+at `docs/index.html` to actually deploy the landing page (build-ready is the
+stated done-bar; the deploy step itself is explicitly the user's to do). This
+is distinct from the "universal hashmap" secondary-indexing idea mentioned in
+a stale structure.rs comment — that was confirmed explicitly out of scope by
+the original intake, not a gap, and was intentionally not implemented per
+the global constraints above.
+
 Resume instructions for a cold agent: read this file top to bottom, check `git log` for
 which task IDs have already been committed (commit message should reference the task
 id, e.g. "T3: ..."), find the first unchecked box, and continue from there. Do not
@@ -313,4 +327,4 @@ Done when: all boxes above are checked and this closing note is added.
 - [x] T10 — Convert main.rs ad-hoc integration script into real test/example
 - [x] T11 — Full warning sweep and final build check
 - [x] T12 — Static landing page (docs/index.html)
-- [ ] T13 — Final PROGRESS.md close-out
+- [x] T13 — Final PROGRESS.md close-out
