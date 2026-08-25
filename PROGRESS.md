@@ -223,7 +223,7 @@ Done when: all boxes above are checked and this closing note is added.
 - [x] T1 — Repo hygiene: gitignore stray artifacts
 - [x] T2 — Fix compiler warnings: unused imports/mut
 - [x] T3 — Persistence round-trip unit tests: Structure to_bytes/from_bytes (HIGH-STAKES)
-- [ ] T4 — Persistence round-trip unit tests: Database save/load (HIGH-STAKES)
+- [x] T4 — Persistence round-trip unit tests: Database save/load (HIGH-STAKES)
 - [ ] T5 — Node unit tests
 - [ ] T6 — Structure unit tests: mode logic and mutation
 - [ ] T7 — protocol.rs: replace unwrap() with proper error handling (HIGH-STAKES)
