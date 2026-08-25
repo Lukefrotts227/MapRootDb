@@ -3,7 +3,6 @@ mod structure;
 mod database;
 mod protocol;
 mod server;
-mod puppet;
 
 pub use node::Node;
 pub use structure::Structure;
