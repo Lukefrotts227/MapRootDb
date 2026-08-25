@@ -1,18 +1,16 @@
 use std::rc::Rc;
 use std::cell::{RefCell, Ref, RefMut};
-use std::collections::HashSet; 
-use std::hash::{Hash, Hasher}; 
+use std::collections::HashSet;
+use std::hash::{Hash, Hasher};
 use bincode::{serialize, deserialize};
-use serde::{Serialize, Deserialize};
-use std::io::Write;
+use serde::Serialize;
+use serde::de::DeserializeOwned;
 
 
 
 
 #[derive(Clone)]
 pub struct NodeRef<T: Clone>(Rc<RefCell<Node<T>>>);
-
-
 
 
 impl<T: Clone + Serialize> NodeRef<T> {
@@ -138,8 +136,8 @@ impl<T: Clone + Serialize> NodeRef<T> {
     pub fn delete_node(&mut self) {
         // remove the node from the given sets of all its parents and children
         // perma delete the node after this
-        let mut node: std::cell::RefMut<'_, Node<T>> = RefCell::borrow_mut(&self.0);
-        
+        let node: std::cell::RefMut<'_, Node<T>> = RefCell::borrow_mut(&self.0);
+
 
         // remove the node from all its parents
         for parent in node.parents.iter() {
@@ -182,6 +180,27 @@ pub struct Node<T: Clone> {
 impl<T: Clone + Serialize> Node<T> {
     pub fn new(key: String, value: T) -> NodeRef<T> {
         NodeRef::new(key, value)
+    }
+}
+
+impl<T: Clone + Serialize + DeserializeOwned> NodeRef<T> {
+    // Returns (node, parent_keys, child_keys) — caller wires up edges after all nodes are created.
+    pub fn deserialize_node(bytes: &[u8]) -> (NodeRef<T>, Vec<String>, Vec<String>) {
+        fn read_field<'a>(bytes: &'a [u8], offset: &mut usize) -> &'a [u8] {
+            let len = u64::from_le_bytes(bytes[*offset..*offset + 8].try_into().unwrap()) as usize;
+            *offset += 8;
+            let data = &bytes[*offset..*offset + len];
+            *offset += len;
+            data
+        }
+
+        let mut offset = 0;
+        let key: String = deserialize(read_field(bytes, &mut offset)).unwrap();
+        let value: T = deserialize(read_field(bytes, &mut offset)).unwrap();
+        let parent_keys: Vec<String> = deserialize(read_field(bytes, &mut offset)).unwrap();
+        let child_keys: Vec<String> = deserialize(read_field(bytes, &mut offset)).unwrap();
+
+        (NodeRef::new(key, value), parent_keys, child_keys)
     }
 }
 

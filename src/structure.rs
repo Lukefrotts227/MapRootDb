@@ -1,12 +1,9 @@
 use std::collections::HashMap;
-use crate::node::{NodeRef}; // Update import to use NodeRef
-use serde::ser::{Serialize, Serializer, SerializeStruct};
-use serde::de::{Deserialize, Deserializer, SeqAccess, Visitor, MapAccess, Error as DeError};
-use std::fmt;
+use crate::node::NodeRef;
+use serde::ser::Serialize;
+use serde::de::DeserializeOwned;
 use bincode::{serialize, deserialize};
 
-
-// add a way to have a hashmap that lets select aspects of the node.value to map to the NodeRef as a whole 
 
 
 
@@ -124,7 +121,7 @@ impl<T: Clone + Eq + Serialize> Structure<T> {
             return false
         }
         let mut node: NodeRef<T> = prim_node.unwrap(); 
-        if (self.mode == "un-strict") {
+        if self.mode == "un-strict" {
             self.nodes.remove(key);
             if self.root.is_some() && self.root.as_ref().unwrap().key() == key {
                 self.root = None;
@@ -196,7 +193,7 @@ impl<T: Clone + Eq + Serialize> Structure<T> {
             return false
         }
 
-        let mut node: NodeRef<T> = prim_node.unwrap(); 
+        let node: NodeRef<T> = prim_node.unwrap();
         if self.mode == "un-strict" {
             self.nodes.remove(key);
             if self.root.is_some() && self.root.as_ref().unwrap().key() == key {
@@ -311,5 +308,81 @@ impl<T: Clone + Eq + Serialize> Structure<T> {
 
 }
 
+impl<T: Clone + Eq + Serialize + DeserializeOwned> Structure<T> {
+    // Rebuild a Structure from the raw serialized node blobs produced by serialize_related_nodes.
+    pub fn from_serialized_nodes(serialized_nodes: Vec<Vec<u8>>, root_key: Option<String>, mode: String) -> Self {
+        let mut node_map: HashMap<String, NodeRef<T>> = HashMap::new();
+        let mut child_edges: Vec<(String, Vec<String>)> = Vec::new();
 
+        for node_bytes in serialized_nodes {
+            let (node_ref, _parent_keys, child_keys) = NodeRef::deserialize_node(&node_bytes);
+            let key = node_ref.key();
+            node_map.insert(key.clone(), node_ref);
+            child_edges.push((key, child_keys));
+        }
 
+        // Wire up edges — add_child sets both sides, so only process children to avoid double-linking.
+        for (node_key, child_keys) in child_edges {
+            let mut node = node_map[&node_key].rc_clone();
+            for child_key in child_keys {
+                if let Some(child) = node_map.get(&child_key) {
+                    node.add_child(child.rc_clone());
+                }
+            }
+        }
+
+        let root = root_key.and_then(|k| node_map.get(&k).map(|n| n.rc_clone()));
+        let has_first_node = !node_map.is_empty();
+        Structure { root, nodes: node_map, mode, has_first_node }
+    }
+
+    pub fn to_bytes(&self) -> Vec<u8> {
+        fn write_framed(buf: &mut Vec<u8>, data: &[u8]) {
+            buf.extend_from_slice(&(data.len() as u64).to_le_bytes());
+            buf.extend_from_slice(data);
+        }
+
+        let mut buf = Vec::new();
+        write_framed(&mut buf, &serialize(&self.root.as_ref().map(|r| r.key())).unwrap());
+        write_framed(&mut buf, &serialize(&self.mode).unwrap());
+
+        let node_blobs = self.serialize_related_nodes();
+        buf.extend_from_slice(&(node_blobs.len() as u64).to_le_bytes());
+        for blob in node_blobs {
+            write_framed(&mut buf, &blob);
+        }
+
+        buf
+    }
+
+    pub fn from_bytes(bytes: &[u8]) -> Self {
+        fn read_framed<'a>(bytes: &'a [u8], offset: &mut usize) -> &'a [u8] {
+            let len = u64::from_le_bytes(bytes[*offset..*offset + 8].try_into().unwrap()) as usize;
+            *offset += 8;
+            let data = &bytes[*offset..*offset + len];
+            *offset += len;
+            data
+        }
+
+        let mut offset = 0;
+        let root_key: Option<String> = deserialize(read_framed(bytes, &mut offset)).unwrap();
+        let mode: String = deserialize(read_framed(bytes, &mut offset)).unwrap();
+        let node_count = u64::from_le_bytes(bytes[offset..offset + 8].try_into().unwrap()) as usize;
+        offset += 8;
+
+        let mut serialized_nodes = Vec::new();
+        for _ in 0..node_count {
+            serialized_nodes.push(read_framed(bytes, &mut offset).to_vec());
+        }
+
+        Self::from_serialized_nodes(serialized_nodes, root_key, mode)
+    }
+
+    pub fn save_to_file(&self, path: &str) -> std::io::Result<()> {
+        std::fs::write(path, self.to_bytes())
+    }
+
+    pub fn load_from_file(path: &str) -> std::io::Result<Self> {
+        Ok(Self::from_bytes(&std::fs::read(path)?))
+    }
+}
