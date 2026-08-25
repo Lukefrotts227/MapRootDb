@@ -183,6 +183,18 @@ FOLLOW-UP NEEDED (dispatch to revive-builder): edit `src/main.rs` -- change
 panic). No changes needed to `src/protocol.rs` or `src/server.rs` -- both were
 independently confirmed correct by the critic.
 
+FOLLOW-UP COMPLETE (2026-08-25): `send()` now returns `std::io::Result<Response>`
+and propagates errors from `write_command`/`read_response` via `?`.
+`run_client_tests()` now returns `std::io::Result<()>` and propagates errors
+from every `send()` call via `?` instead of `.unwrap()`. The `thread::spawn`
+call site in `main()` now wraps the call in a closure that matches on the
+`Result` and prints via `eprintln!` on `Err` rather than letting a panic
+propagate. `src/protocol.rs` and `src/server.rs` were not touched. Verified
+with `cargo build`, `cargo test` (21 passed in both lib and bin test
+binaries), and `cargo run` (full Ping/AddStructure/AddNode/AddEdge/GetNode/
+GetStructure/Save/error-case client flow completed successfully end-to-end).
+The T7 checkbox below can now be treated as fully closed, not provisional.
+
 ### SEPARATE URGENT FINDING (independently verified, not part of T7 scope)
 `.gitignore` line 4 adds `PROGRESS.md`, and commit `39c79df "stop tracking
 PROGRESS.md"` already `git rm --cached`'d it -- confirmed via
