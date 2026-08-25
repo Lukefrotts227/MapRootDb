@@ -136,7 +136,7 @@ impl<T: Clone + Serialize> NodeRef<T> {
     pub fn delete_node(&mut self) {
         // remove the node from the given sets of all its parents and children
         // perma delete the node after this
-        let node: std::cell::RefMut<'_, Node<T>> = RefCell::borrow_mut(&self.0);
+        let node: Ref<'_, Node<T>> = RefCell::borrow(&self.0);
 
 
         // remove the node from all its parents
@@ -159,13 +159,13 @@ impl<T: Clone + Serialize> NodeRef<T> {
 
 impl<T: Clone> Hash for NodeRef<T> {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.0.borrow_mut().key.hash(state);
+        self.0.borrow().key.hash(state);
     }
 }
 
 impl<T: Clone> PartialEq for NodeRef<T> {
     fn eq(&self, other: &Self) -> bool {
-        self.0.borrow_mut().key == other.0.borrow().key
+        self.0.borrow().key == other.0.borrow().key
     }
 }
 
@@ -201,6 +201,84 @@ impl<T: Clone + Serialize + DeserializeOwned> NodeRef<T> {
         let child_keys: Vec<String> = deserialize(read_field(bytes, &mut offset)).unwrap();
 
         (NodeRef::new(key, value), parent_keys, child_keys)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn add_child_and_add_parent_are_bidirectional() {
+        let mut a: NodeRef<String> = NodeRef::new("a".to_string(), "va".to_string());
+        let mut b: NodeRef<String> = NodeRef::new("b".to_string(), "vb".to_string());
+
+        a.add_child(b.rc_clone());
+        assert!(a.has_child_by_key("b"));
+        assert!(b.has_parent_by_key("a"));
+
+        let mut c: NodeRef<String> = NodeRef::new("c".to_string(), "vc".to_string());
+        c.add_parent(a.rc_clone());
+        assert!(c.has_parent_by_key("a"));
+        assert!(a.has_child_by_key("c"));
+    }
+
+    #[test]
+    fn delete_node_removes_from_parents_and_children() {
+        let mut parent: NodeRef<String> = NodeRef::new("parent".to_string(), "p".to_string());
+        let mut child: NodeRef<String> = NodeRef::new("child".to_string(), "c".to_string());
+
+        parent.add_child(child.rc_clone());
+        assert!(parent.has_child_by_key("child"));
+        assert!(child.has_parent_by_key("parent"));
+
+        child.delete_node();
+
+        assert!(!parent.has_child_by_key("child"));
+    }
+
+    #[test]
+    fn has_parent_by_key_and_get_child_by_key_work() {
+        let mut a: NodeRef<String> = NodeRef::new("a".to_string(), "va".to_string());
+        let b: NodeRef<String> = NodeRef::new("b".to_string(), "vb".to_string());
+
+        a.add_child(b.rc_clone());
+
+        assert!(!a.has_parent_by_key("b"));
+        assert!(b.has_parent_by_key("a"));
+
+        let found = a.get_child_by_key("b");
+        assert!(found.is_some());
+        assert_eq!(found.unwrap().key(), "b");
+
+        assert!(a.get_child_by_key("nonexistent").is_none());
+    }
+
+    #[test]
+    fn edit_value_updates_value() {
+        let mut a: NodeRef<String> = NodeRef::new("a".to_string(), "old".to_string());
+        assert_eq!(a.value(), "old".to_string());
+
+        a.edit_value("new".to_string());
+        assert_eq!(a.value(), "new".to_string());
+    }
+
+    #[test]
+    fn serialize_deserialize_node_round_trips() {
+        let mut node: NodeRef<String> = NodeRef::new("key1".to_string(), "value1".to_string());
+        let mut parent: NodeRef<String> = NodeRef::new("parent1".to_string(), "pval".to_string());
+        let mut child: NodeRef<String> = NodeRef::new("child1".to_string(), "cval".to_string());
+
+        node.add_parent(parent.rc_clone());
+        node.add_child(child.rc_clone());
+
+        let bytes = node.serialize_node();
+        let (deserialized, parent_keys, child_keys) = NodeRef::<String>::deserialize_node(&bytes);
+
+        assert_eq!(deserialized.key(), "key1");
+        assert_eq!(deserialized.value(), "value1".to_string());
+        assert_eq!(parent_keys, vec!["parent1".to_string()]);
+        assert_eq!(child_keys, vec!["child1".to_string()]);
     }
 }
 
