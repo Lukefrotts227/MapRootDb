@@ -42,21 +42,6 @@ impl<T: Clone + Eq + Serialize> Structure<T> {
     // more modes will be added but this is good to get it going
     
    
-    pub fn serialize_related_ids(&self) -> Vec<u8>{
-        // in this function I am seraialing all the keys of the given hashmap so that I can rebuild by grabbing all the nodes by key allowing for rebuild
-        let mut keys: Vec<String> = Vec::new(); 
-        for (key, _) in self.nodes.iter(){
-            keys.push(key.clone()); 
-        }
-
-        // seraialize with bincode
-        let serialized = serialize(&keys).unwrap();
-
-        // now lets retun this vector
-        serialized 
-
-    }
-
     pub fn serialize_related_nodes(&self) -> Vec<Vec<u8>>{
         // we can use the seralize function that I wrote for indiv nodes
         let mut over_vector: Vec<Vec<u8>> = Vec::new(); 
@@ -181,65 +166,6 @@ impl<T: Clone + Eq + Serialize> Structure<T> {
 
 
     }
-    pub fn remove_node_by_key(&mut self, key: &str) -> bool {
-        // remove the node from the structure by key
-        // only removes the node from the hashmap and does not actually delete the node 
-        // all relationships will remain the same
-        // return false if the node is not found
-        // return false if this breaks the current strictness of the structure  
-
-        let prim_node = self.find_node_by_key(key);
-        if prim_node.is_none() {
-            return false
-        }
-
-        let node: NodeRef<T> = prim_node.unwrap();
-        if self.mode == "un-strict" {
-            self.nodes.remove(key);
-            if self.root.is_some() && self.root.as_ref().unwrap().key() == key {
-                self.root = None;
-            }
-            if self.nodes.len() == 0 {
-                self.has_first_node = false;
-            }
-            return true
-        }
-
-        let parents: std::cell::Ref<'_, std::collections::HashSet<NodeRef<T>>> = node.parents();
-        let children: std::cell::Ref<'_, std::collections::HashSet<NodeRef<T>>> = node.children(); 
-
-        if parents.len() == 0 && children.len() == 0 && !self.has_first_node {
-            return false
-        } else if parents.len() == 0 && children.len() == 0 && self.has_first_node {
-            return true
-        }
-
-
-        for parent in parents.iter() {
-            if !self.semi_strict_check_for_one(parent.rc_clone(), key) {
-                return false
-            }
-        }
-
-        for child in children.iter() {
-            if !self.semi_strict_check_for_one(child.rc_clone(), key) {
-                return false
-            }
-        }   
-
-        self.nodes.remove(key); 
-        if self.root.is_some() && self.root.as_ref().unwrap().key() == key {
-            self.root = None;
-        }
-        if self.nodes.len() == 0 {
-            self.has_first_node = false;
-        }
-
-        return true
-
-
-    }
-
     pub fn find_node_by_key(&self, key: &str) -> Option<NodeRef<T>> {
         // find a node in the structure by key using the hashmap 
         // return the reference to the node if found
