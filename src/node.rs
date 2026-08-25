@@ -211,7 +211,7 @@ mod tests {
     #[test]
     fn add_child_and_add_parent_are_bidirectional() {
         let mut a: NodeRef<String> = NodeRef::new("a".to_string(), "va".to_string());
-        let mut b: NodeRef<String> = NodeRef::new("b".to_string(), "vb".to_string());
+        let b: NodeRef<String> = NodeRef::new("b".to_string(), "vb".to_string());
 
         a.add_child(b.rc_clone());
         assert!(a.has_child_by_key("b"));
@@ -266,8 +266,8 @@ mod tests {
     #[test]
     fn serialize_deserialize_node_round_trips() {
         let mut node: NodeRef<String> = NodeRef::new("key1".to_string(), "value1".to_string());
-        let mut parent: NodeRef<String> = NodeRef::new("parent1".to_string(), "pval".to_string());
-        let mut child: NodeRef<String> = NodeRef::new("child1".to_string(), "cval".to_string());
+        let parent: NodeRef<String> = NodeRef::new("parent1".to_string(), "pval".to_string());
+        let child: NodeRef<String> = NodeRef::new("child1".to_string(), "cval".to_string());
 
         node.add_parent(parent.rc_clone());
         node.add_child(child.rc_clone());

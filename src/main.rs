@@ -1,15 +1,8 @@
-mod node;
-mod structure;
-mod database;
-mod protocol;
-mod server;
-
 use std::net::TcpStream;
 use std::thread;
 use std::time::Duration;
 
-use database::{Database, DatabaseValue};
-use protocol::{Command, Response, write_command, read_response};
+use maprootdb::{Database, DatabaseValue, Command, Response, write_command, read_response};
 
 fn send(stream: &mut TcpStream, cmd: Command) -> std::io::Result<Response> {
     write_command(stream, &cmd)?;
@@ -114,6 +107,6 @@ fn main() {
         });
     }
 
-    server::start(db, "127.0.0.1:7878");
+    maprootdb::start(db, "127.0.0.1:7878");
     println!("Server shut down.");
 }
