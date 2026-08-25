@@ -225,7 +225,7 @@ Done when: all boxes above are checked and this closing note is added.
 - [x] T3 — Persistence round-trip unit tests: Structure to_bytes/from_bytes (HIGH-STAKES)
 - [x] T4 — Persistence round-trip unit tests: Database save/load (HIGH-STAKES)
 - [x] T5 — Node unit tests
-- [ ] T6 — Structure unit tests: mode logic and mutation
+- [x] T6 — Structure unit tests: mode logic and mutation
 - [ ] T7 — protocol.rs: replace unwrap() with proper error handling (HIGH-STAKES)
 - [ ] T8 — Resolve unused Structure helpers (remove_node_by_key, serialize_related_ids)
 - [ ] T9 — Resolve puppet.rs stub
