@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MapRootDb</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #171a21;
+    --border: #2a2f3a;
+    --text: #e6e6e6;
+    --muted: #9aa3b2;
+    --accent: #6ea8fe;
+    --code-bg: #0b0d11;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+  }
+  .hero {
+    padding: 5rem 1.5rem 3rem;
+    text-align: center;
+    border-bottom: 1px solid var(--border);
+  }
+  .hero h1 {
+    font-size: 2.6rem;
+    margin: 0 0 0.5rem;
+    letter-spacing: -0.02em;
+  }
+  .hero p.tagline {
+    font-size: 1.15rem;
+    color: var(--muted);
+    max-width: 640px;
+    margin: 0 auto;
+  }
+  main {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 2.5rem 1.5rem 4rem;
+  }
+  section {
+    margin-bottom: 2.5rem;
+  }
+  h2 {
+    font-size: 1.3rem;
+    border-left: 4px solid var(--accent);
+    padding-left: 0.6rem;
+    margin-bottom: 1rem;
+  }
+  p {
+    color: var(--text);
+  }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem 1.25rem;
+  }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 1rem;
+    overflow-x: auto;
+    font-size: 0.92rem;
+  }
+  code {
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  }
+  .btn {
+    display: inline-block;
+    background: var(--accent);
+    color: #0f1115;
+    font-weight: 600;
+    text-decoration: none;
+    padding: 0.7rem 1.4rem;
+    border-radius: 6px;
+    transition: opacity 0.15s ease;
+  }
+  .btn:hover {
+    opacity: 0.85;
+  }
+  footer {
+    text-align: center;
+    color: var(--muted);
+    padding: 2rem 1.5rem;
+    border-top: 1px solid var(--border);
+    font-size: 0.9rem;
+  }
+  footer a {
+    color: var(--accent);
+  }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <h1>MapRootDb</h1>
+  <p class="tagline">An in-memory Rust database built around a Node/Structure DAG model, with bincode persistence and a TCP protocol/server.</p>
+</div>
+
+<main>
+  <section>
+    <h2>What is this?</h2>
+    <p>
+      MapRootDb is a small database engine written in Rust. Data is organized as a directed
+      acyclic graph of <code>Node</code> objects held inside a <code>Structure</code>, giving
+      each record explicit parent/child relationships rather than a flat table layout. The
+      <code>Database</code> can hold multiple structures at once, and everything can be
+      serialized to disk with <code>bincode</code> and reloaded later. A simple TCP protocol
+      and server expose the database over the network so clients can connect and issue
+      commands directly.
+    </p>
+  </section>
+
+  <section>
+    <h2>Build &amp; install</h2>
+    <div class="panel">
+      <pre><code>git clone https://github.com/Lukefrotts227/MapRootDb
+cd MapRootDb
+cargo build --release
+cargo run</code></pre>
+    </div>
+    <p>Requires a working <a href="https://www.rust-lang.org/tools/install" style="color: var(--accent);">Rust toolchain</a> (cargo included).</p>
+  </section>
+
+  <section style="text-align: center;">
+    <h2 style="display: none;">Repository</h2>
+    <a class="btn" href="https://github.com/Lukefrotts227/MapRootDb" target="_blank" rel="noopener noreferrer">
+      View on GitHub
+    </a>
+  </section>
+</main>
+
+<footer>
+  <p><a href="https://github.com/Lukefrotts227/MapRootDb" target="_blank" rel="noopener noreferrer">github.com/Lukefrotts227/MapRootDb</a></p>
+</footer>
+
+</body>
+</html>
