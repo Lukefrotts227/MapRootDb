@@ -311,6 +311,6 @@ Done when: all boxes above are checked and this closing note is added.
 - [x] T8 — Resolve unused Structure helpers (remove_node_by_key, serialize_related_ids)
 - [x] T9 — Resolve puppet.rs stub
 - [x] T10 — Convert main.rs ad-hoc integration script into real test/example
-- [ ] T11 — Full warning sweep and final build check
+- [x] T11 — Full warning sweep and final build check
 - [ ] T12 — Static landing page (docs/index.html)
 - [ ] T13 — Final PROGRESS.md close-out
