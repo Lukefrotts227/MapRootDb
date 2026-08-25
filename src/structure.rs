@@ -281,9 +281,9 @@ impl<T: Clone + Eq + Serialize> Structure<T> {
         let children = node.children();
 
         if parents.len() == 0 && children.len() == 0 && !self.has_first_node {
-            return false
-        } else if parents.len() == 0 && children.len() == 0 && self.has_first_node {
             return true
+        } else if parents.len() == 0 && children.len() == 0 && self.has_first_node {
+            return false
         }
 
         // iterate through the parents hashset and if the parent is in the structure return true
@@ -291,7 +291,7 @@ impl<T: Clone + Eq + Serialize> Structure<T> {
         for parent in parents.iter() {
             if self.nodes.contains_key(&parent.key()) {
                 return true
-            }           
+            }
         }
 
         // iterate through the children hashset and if the child is in the structure return true
@@ -509,5 +509,147 @@ mod tests {
         assert_eq!(restored.root.as_ref().unwrap().key(), "root");
         assert!(restored.find_node_by_key("root").unwrap().has_child_by_key("child"));
         assert!(restored.find_node_by_key("child").unwrap().has_parent_by_key("root"));
+    }
+
+    #[test]
+    fn un_strict_allows_arbitrary_add_node() {
+        let mut structure: Structure<DatabaseValue> = Structure::new(None, "un-strict".to_string());
+        assert_eq!(structure.has_first_node, false);
+
+        // first node, no parents/children
+        let a: NodeRef<DatabaseValue> = NodeRef::new("a".to_string(), DatabaseValue::Int(1));
+        assert!(structure.add_node(a.rc_clone()).is_ok());
+        assert!(structure.has_first_node);
+
+        // second node, completely unrelated to anything in the structure
+        let b: NodeRef<DatabaseValue> = NodeRef::new("b".to_string(), DatabaseValue::Int(2));
+        assert!(structure.add_node(b.rc_clone()).is_ok());
+        assert_eq!(structure.nodes.len(), 2);
+    }
+
+    #[test]
+    fn semi_strict_allows_first_node_freely() {
+        let mut structure: Structure<DatabaseValue> = Structure::new(None, "semi-strict".to_string());
+        assert_eq!(structure.has_first_node, false);
+
+        let a: NodeRef<DatabaseValue> = NodeRef::new("a".to_string(), DatabaseValue::Int(1));
+        let result = structure.add_node(a.rc_clone());
+        assert!(result.is_ok());
+        assert!(structure.has_first_node);
+        assert_eq!(structure.nodes.len(), 1);
+    }
+
+    #[test]
+    fn semi_strict_rejects_orphaned_add_after_first_node() {
+        let mut structure: Structure<DatabaseValue> = Structure::new(None, "semi-strict".to_string());
+
+        let a: NodeRef<DatabaseValue> = NodeRef::new("a".to_string(), DatabaseValue::Int(1));
+        structure.add_node(a.rc_clone()).expect("first node add should succeed");
+
+        // orphan node: no parents or children linking it into the structure
+        let b: NodeRef<DatabaseValue> = NodeRef::new("b".to_string(), DatabaseValue::Int(2));
+        let result = structure.add_node(b.rc_clone());
+        assert!(result.is_err());
+        assert_eq!(structure.nodes.len(), 1);
+        assert!(structure.find_node_by_key("b").is_none());
+    }
+
+    #[test]
+    fn semi_strict_allows_add_with_existing_parent_link() {
+        let mut structure: Structure<DatabaseValue> = Structure::new(None, "semi-strict".to_string());
+
+        let a: NodeRef<DatabaseValue> = NodeRef::new("a".to_string(), DatabaseValue::Int(1));
+        structure.add_node(a.rc_clone()).expect("first node add should succeed");
+
+        // b is linked to a (already in structure), so it should be accepted
+        let b: NodeRef<DatabaseValue> = NodeRef::new("b".to_string(), DatabaseValue::Int(2));
+        {
+            let mut a_mut = a.rc_clone();
+            a_mut.add_child(b.rc_clone());
+        }
+        let result = structure.add_node(b.rc_clone());
+        assert!(result.is_ok());
+        assert_eq!(structure.nodes.len(), 2);
+    }
+
+    #[test]
+    fn has_first_node_transitions_on_first_insert() {
+        let mut un_strict: Structure<DatabaseValue> = Structure::new(None, "un-strict".to_string());
+        assert_eq!(un_strict.has_first_node, false);
+        let n: NodeRef<DatabaseValue> = NodeRef::new("n".to_string(), DatabaseValue::Int(1));
+        un_strict.add_node(n).unwrap();
+        assert!(un_strict.has_first_node);
+
+        let mut semi_strict: Structure<DatabaseValue> = Structure::new(None, "semi-strict".to_string());
+        assert_eq!(semi_strict.has_first_node, false);
+        let m: NodeRef<DatabaseValue> = NodeRef::new("m".to_string(), DatabaseValue::Int(1));
+        semi_strict.add_node(m).unwrap();
+        assert!(semi_strict.has_first_node);
+
+        // new() with a root already set should also mark has_first_node true
+        let root: NodeRef<DatabaseValue> = NodeRef::new("root".to_string(), DatabaseValue::Int(1));
+        let with_root: Structure<DatabaseValue> = Structure::new(Some(root), "un-strict".to_string());
+        assert!(with_root.has_first_node);
+    }
+
+    #[test]
+    fn delete_node_by_key_un_strict_allows_orphaning() {
+        let root: NodeRef<DatabaseValue> = NodeRef::new("root".to_string(), DatabaseValue::Int(0));
+        let mut structure: Structure<DatabaseValue> = Structure::new(Some(root.rc_clone()), "un-strict".to_string());
+
+        let child: NodeRef<DatabaseValue> = NodeRef::new("child".to_string(), DatabaseValue::Int(1));
+        {
+            let mut root_mut = root.rc_clone();
+            root_mut.add_child(child.rc_clone());
+        }
+        structure.add_node(child.rc_clone()).expect("child add failed");
+
+        // deleting root would orphan child in a strict sense, but un-strict must allow it
+        let deleted = structure.delete_node_by_key("root");
+        assert!(deleted);
+        assert!(structure.find_node_by_key("root").is_none());
+        assert!(structure.find_node_by_key("child").is_some());
+    }
+
+    #[test]
+    fn delete_node_by_key_semi_strict_blocks_orphaning_deletion() {
+        let root: NodeRef<DatabaseValue> = NodeRef::new("root".to_string(), DatabaseValue::Int(0));
+        let mut structure: Structure<DatabaseValue> = Structure::new(Some(root.rc_clone()), "semi-strict".to_string());
+
+        let child: NodeRef<DatabaseValue> = NodeRef::new("child".to_string(), DatabaseValue::Int(1));
+        {
+            let mut root_mut = root.rc_clone();
+            root_mut.add_child(child.rc_clone());
+        }
+        structure.add_node(child.rc_clone()).expect("child add failed");
+
+        // deleting root would leave child with no valid parent/child in the structure -> must be blocked
+        let deleted = structure.delete_node_by_key("root");
+        assert_eq!(deleted, false);
+        assert!(structure.find_node_by_key("root").is_some());
+        assert!(structure.find_node_by_key("child").is_some());
+    }
+
+    #[test]
+    fn delete_node_by_key_semi_strict_allows_safe_deletion() {
+        let root: NodeRef<DatabaseValue> = NodeRef::new("root".to_string(), DatabaseValue::Int(0));
+        let mut structure: Structure<DatabaseValue> = Structure::new(Some(root.rc_clone()), "semi-strict".to_string());
+
+        let child_a: NodeRef<DatabaseValue> = NodeRef::new("child_a".to_string(), DatabaseValue::Int(1));
+        let child_b: NodeRef<DatabaseValue> = NodeRef::new("child_b".to_string(), DatabaseValue::Int(2));
+        {
+            let mut root_mut = root.rc_clone();
+            root_mut.add_child(child_a.rc_clone());
+            root_mut.add_child(child_b.rc_clone());
+        }
+        structure.add_node(child_a.rc_clone()).expect("child_a add failed");
+        structure.add_node(child_b.rc_clone()).expect("child_b add failed");
+
+        // deleting child_a is safe: root still has child_b, and child_a has no children of its own
+        let deleted = structure.delete_node_by_key("child_a");
+        assert!(deleted);
+        assert!(structure.find_node_by_key("child_a").is_none());
+        assert!(structure.find_node_by_key("root").is_some());
+        assert!(structure.find_node_by_key("child_b").is_some());
     }
 }
