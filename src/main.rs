@@ -100,11 +100,19 @@ fn run_client_tests() -> std::io::Result<()> {
 fn main() {
     let db = Database::new();
 
-    thread::spawn(|| {
-        if let Err(e) = run_client_tests() {
-            eprintln!("run_client_tests failed: {}", e);
-        }
-    });
+    // The ad-hoc client integration script only runs when explicitly requested,
+    // either via `cargo run -- --run-client-tests` or the RUN_CLIENT_TESTS env var.
+    // This keeps `cargo run` starting a clean server by default (see PROGRESS.md T10).
+    let run_tests = std::env::args().any(|a| a == "--run-client-tests")
+        || std::env::var("RUN_CLIENT_TESTS").is_ok();
+
+    if run_tests {
+        thread::spawn(|| {
+            if let Err(e) = run_client_tests() {
+                eprintln!("run_client_tests failed: {}", e);
+            }
+        });
+    }
 
     server::start(db, "127.0.0.1:7878");
     println!("Server shut down.");
