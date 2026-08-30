@@ -2,4 +2,5 @@
 node_modules
 *.bin
 PROGRESS.md
+REPORT.md
 .agents/
