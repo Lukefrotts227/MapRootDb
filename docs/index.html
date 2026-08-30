@@ -101,20 +101,21 @@
 
 <div class="hero">
   <h1>MapRootDb</h1>
-  <p class="tagline">An in-memory Rust database built around a Node/Structure DAG model, with bincode persistence and a TCP protocol/server.</p>
+  <p class="tagline">An experimental in-memory DAG relationship store with typed values, snapshots, and a loopback-only Rust TCP server.</p>
 </div>
 
 <main>
   <section>
     <h2>What is this?</h2>
     <p>
-      MapRootDb is a small database engine written in Rust. Data is organized as a directed
+      MapRootDb is a small relationship store written in Rust. Data is organized as a directed
       acyclic graph of <code>Node</code> objects held inside a <code>Structure</code>, giving
       each record explicit parent/child relationships rather than a flat table layout. The
       <code>Database</code> can hold multiple structures at once, and everything can be
       serialized to disk with <code>bincode</code> and reloaded later. A simple TCP protocol
-      and server expose the database over the network so clients can connect and issue
-      commands directly.
+      and server expose the database to trusted local clients on localhost. This is an alpha:
+      its persistence and wire formats are deliberately not yet stable. It is intended for
+      learning and non-critical local prototypes.
     </p>
   </section>
 
@@ -124,9 +125,46 @@
       <pre><code>git clone https://github.com/Lukefrotts227/MapRootDb
 cd MapRootDb
 cargo build --release
-cargo run</code></pre>
+cargo run -- demo
+cargo run -- serve</code></pre>
     </div>
     <p>Requires a working <a href="https://www.rust-lang.org/tools/install" style="color: var(--accent);">Rust toolchain</a> (cargo included).</p>
+    <p>The demo builds and queries a semi-strict graph, saves a snapshot, and exits. The serve
+      command runs the localhost server; use <code>cargo run -- --help</code> for configuration.</p>
+    <p>In a second terminal, run the complete client walkthrough:</p>
+    <div class="panel">
+      <pre><code>cargo run --example tcp_client -- 127.0.0.1:7878 tcp-client-demo.bin</code></pre>
+    </div>
+    <p>This pings the server, creates and queries a graph, saves a snapshot, and shuts down cleanly.</p>
+  </section>
+
+  <section>
+    <h2>Scope</h2>
+    <p>MapRootDb stores keyed typed values and explicit parent/child relationships in directed
+      acyclic graphs. It retrieves individual nodes or complete structures. It does not yet provide
+      a query language, path/traversal queries, secondary indexes, transactions, or a production
+      durability guarantee.</p>
+  </section>
+
+  <section>
+    <h2>Security &amp; limitations</h2>
+    <div class="panel">
+      <p>The server enforces loopback-only binding. It has no authentication or encryption, and
+        clients can request snapshot writes to paths visible to the server process. Do not expose it
+        to untrusted clients.</p>
+      <p>Snapshots currently lack a magic header, format version, checksum, atomic replacement, and
+        recovery log. The wire and snapshot formats are unstable. Connections use one thread each
+        with 30-second read/write timeouts, and strong parent/child <code>Rc</code> links can retain
+        connected nodes after a structure is dropped.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Recovery</h2>
+    <p><code>--database PATH</code> loads an existing snapshot and fails if it is missing or invalid;
+      omit it to start empty. Occupied ports return an error, and non-loopback addresses are rejected.
+      Ctrl+C and <code>Command::Shutdown</code> stop the server cleanly. See the repository README for
+      verification commands and complete API notes.</p>
   </section>
 
   <section style="text-align: center;">
